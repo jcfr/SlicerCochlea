@@ -33,12 +33,13 @@ import sitkUtils, sys ,math, platform
 import numpy as np, SimpleITK as sitk
 import vtkSegmentationCorePython as vtkSegmentationCore
 from __main__ import vtk, qt, ctk, slicer
-from slicer.ScriptedLoadableModule import *   
+from slicer.ScriptedLoadableModule import *
+import SampleData
+
 from copy import deepcopy
 from collections import defaultdict
 from os.path import expanduser
 from os.path import isfile
-from os.path import basename
 from PythonQt import BoolResult
 from shutil import copyfile
 
@@ -114,7 +115,7 @@ class CochleaSegWidget(ScriptedLoadableModuleWidget):
 
     # Set default VisSIm location in the user home 
     #TODO: add option user-defined path when installed first time 
-    self.vsc   = VisSimCommon.VisSimCommonLogic()   
+    self.vsc   = VisSimCommon.VisSimCommonLogic()
     self.vsc.setGlobalVariables(0)
     
     #----------------------------------------------------------------- 
@@ -297,12 +298,11 @@ class CochleaSegLogic(ScriptedLoadableModuleLogic):
       resTransPath=resTransPathOld[0:-6]+'Pars.txt'        
       resOldDefPath = os.path.join(self.vsc.vtVars['outputPath'] , "deformationField"+self.vsc.vtVars['imgType'])
       resDefPath    = os.path.join(self.vsc.vtVars['outputPath'] , inputVolumeNode.GetName()+"_dFld"+self.vsc.vtVars['imgType'])
-      inputImgName  = inputVolumeNode.GetStorageNode().GetFileName()
-      inputImgName  = basename(os.path.splitext(inputImgName)[0])    
+      inputImgName  = inputVolumeNode.GetName()
         
-      segNodeName   = inputVolumeNode.GetName() + "_S.Seg"                 
-      stpNodeName   = inputVolumeNode.GetName() + "_StPts"
-      transNodeName = inputVolumeNode.GetName() + "_Transform"
+      segNodeName   = inputImgName + "_S.Seg"
+      stpNodeName   = inputImgName + "_StPts"
+      transNodeName = inputImgName + "_Transform"
 
       self.vsc.removeOtputsFolderContents()
       # check if the model is found
@@ -419,50 +419,55 @@ class CochleaSegLogic(ScriptedLoadableModuleLogic):
 class CochleaSegTest(ScriptedLoadableModuleTest):
   def setUp(self):
       slicer.mrmlScene.Clear(0)
+      self.vsc   = VisSimCommon.VisSimCommonLogic()
+      self.vsc.vtVars = self.vsc.setGlobalVariables(0)
   #endef   
 
   def runTest(self):
       self.setUp()
-
-      self.vsc   = VisSimCommon.VisSimCommonLogic()   
-      self.vsc.vtVars = self.vsc.setGlobalVariables(0)
-
-      cochleaSide  = "R"
-      beforORafter ="_b" # _a= before, _b=after     
-      imgPath = os.path.join(self.vsc.vtVars['vissimPath'],"img"+cochleaSide+beforORafter+".nrrd")
-
-      # don't download if already downloaded                       
-      if (beforORafter=="_b" and cochleaSide=="L"):        
-         cochleaPoint = [195,218,95]
-         imgWebLink = "https://cloud.uni-koblenz-landau.de/s/qMG2WPjTXabzcbX/download"
-      elif(beforORafter=="_a" and cochleaSide=="L"):
-         cochleaPoint = [214,242,78]
-         imgWebLink = "https://cloud.uni-koblenz-landau.de/s/EwQiQidXqTcGySB/download"
-      elif(beforORafter=="_b" and cochleaSide=="R"):
-         cochleaPoint = [194,216,93]
-         imgWebLink = "https://cloud.uni-koblenz-landau.de/s/qMG2WPjTXabzcbX/download"
-      elif(beforORafter=="_a" and cochleaSide=="R"):
-         cochleaPoint = [296,208,76]
-         imgWebLink = "https://cloud.uni-koblenz-landau.de/s/EwQiQidXqTcGySB/download"
-      else:
-          print("error in cochlea side or before after type")
-      #endif  
-      if not os.path.exists(imgPath):
-         try:         
-             print("Downloading cochlea sample image ...")
-             urllib.request.urlretrieve (imgWebLink ,imgPath )
-         except Exception as e:
-             print("Error: can not download sample file  ...")
-             print(e)   
-             return -1
-         #end try-except 
-      #endif
-
-      self.testSlicerCochleaSegmentation(imgPath , cochleaPoint, cochleaSide)
-
+      self.testSlicerCochleaSegmentationBeforeLeft()
+      self.testSlicerCochleaSegmentationBeforeRight()
+      self.testSlicerCochleaSegmentationAfterLeft()
+      self.testSlicerCochleaSegmentationAfterRight()
   #enddef
 
-  def testSlicerCochleaSegmentation(self, imgPath,cochleaPoint, cochleaSide):
+  def testSlicerCochleaSegmentationBeforeLeft(self):
+      cochleaPoint = [214,242,78]
+      inputVolumeNode = SampleData.downloadFromURL(
+          nodeNames='P100001_DV_L_a',
+          fileNames='P100001_DV_L_a.nrrd',
+          uris='https://cloud.uni-koblenz-landau.de/s/EwQiQidXqTcGySB/download',
+          checksums='SHA256:d7cda4e106294a59591f03e74fbe9ecffa322dd1a9010b4d0590b377acc05eb5')[0]
+      self.cochleaSegmentation(inputVolumeNode, cochleaPoint, "L")
+
+  def testSlicerCochleaSegmentationBeforeRight(self):
+      cochleaPoint = [195,218,95]
+      inputVolumeNode = SampleData.downloadFromURL(
+          nodeNames='P100001_DV_L_b',
+          fileNames='P100001_DV_L_b.nrrd',
+          uris='https://cloud.uni-koblenz-landau.de/s/qMG2WPjTXabzcbX/download',
+          checksums='SHA256:9a5722679caa978b1a566f4a148c8759ce38158ca75813925a2d4f964fdeebf5')[0]
+      self.cochleaSegmentation(inputVolumeNode, cochleaPoint, "R")
+
+  def testSlicerCochleaSegmentationAfterLeft(self):
+      cochleaPoint = [296,208,76]
+      inputVolumeNode = SampleData.downloadFromURL(
+          nodeNames='P100001_DV_L_a',
+          fileNames='P100001_DV_L_a.nrrd',
+          uris='https://cloud.uni-koblenz-landau.de/s/EwQiQidXqTcGySB/download',
+          checksums='SHA256:d7cda4e106294a59591f03e74fbe9ecffa322dd1a9010b4d0590b377acc05eb5')[0]
+      self.cochleaSegmentation(inputVolumeNode, cochleaPoint, "L")
+
+  def testSlicerCochleaSegmentationAfterRight(self):
+      cochleaPoint = [194,216,93]
+      inputVolumeNode = SampleData.downloadFromURL(
+          nodeNames='P100001_DV_L_b',
+          fileNames='P100001_DV_L_b.nrrd',
+          uris='https://cloud.uni-koblenz-landau.de/s/qMG2WPjTXabzcbX/download',
+          checksums='SHA256:9a5722679caa978b1a566f4a148c8759ce38158ca75813925a2d4f964fdeebf5')[0]
+      self.cochleaSegmentation(inputVolumeNode, cochleaPoint, "R")
+
+  def cochleaSegmentation(self, inputVolumeNode, cochleaPoint, cochleaSide):
       self.delayDisplay("Starting testSlicerCochleaSegmentation test")
       self.stm=time.time()
 
@@ -480,8 +485,6 @@ class CochleaSegTest(ScriptedLoadableModuleTest):
       # the download link
       # TODO: fix datastore link download problem, the file is created before downloaded   
       #   imgLaWeb = "http://slicer.kitware.com/midas3/download/item/381221/P100001_DV_L_a"
-
-      [success, inputVolumeNode] = slicer.util.loadVolume( imgPath, returnNode=True)
     
       # create a fiducial node for cochlea location for cropping    
       cochleaPointRAS = self.vsc.ptIJK2RAS(cochleaPoint,inputVolumeNode) 
